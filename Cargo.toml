@@ -1,0 +1,16 @@
+[package]
+name = "wasmprof"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wasmprof"
+path = "src/bin/wasmprof.rs"
+
+[dependencies]
+libc = "0.2.140"
+nix = { version = "0.26", default-features = false, features = ["signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasmtime = { path = "../wasmtime/crates/wasmtime" }
+wasmtime-runtime = { path = "../wasmtime/crates/runtime" }
