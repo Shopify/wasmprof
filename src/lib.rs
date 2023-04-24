@@ -1,11 +1,11 @@
 use std::{collections::HashMap, os::raw::c_int};
 
 use nix::{libc, sys::signal};
-use wasmtime::{ Store, WasmBacktrace};
-mod speedscope;
+use wasmtime::{Store, WasmBacktrace};
 mod collapsed_stack;
-mod timer;
 mod profile_data;
+mod speedscope;
+mod timer;
 
 static mut ENGINE: Option<wasmtime::Engine> = None;
 static mut TIMER: Option<timer::Timer> = None;
@@ -82,7 +82,7 @@ fn unregister_signal_handler() -> nix::Result<()> {
 
 pub enum WeightUnit {
     Nanoseconds,
-    Fuel
+    Fuel,
 }
 
 pub fn wasmprof<T, FnReturn>(
@@ -93,7 +93,9 @@ pub fn wasmprof<T, FnReturn>(
     f: impl FnOnce(&mut Store<T>) -> FnReturn,
 ) -> (wasmtime::Engine, profile_data::ProfileData, FnReturn) {
     register_signal_handler().unwrap();
-    unsafe { TIMER = Some(timer::Timer::new(frequency)); }
+    unsafe {
+        TIMER = Some(timer::Timer::new(frequency));
+    }
 
     store.set_epoch_deadline(1);
     store.epoch_deadline_callback(move |context| {
@@ -114,7 +116,9 @@ pub fn wasmprof<T, FnReturn>(
 
     let fn_return = f(store);
 
-    unsafe { TIMER = None; }
+    unsafe {
+        TIMER = None;
+    }
     unregister_signal_handler().unwrap();
     store.epoch_deadline_trap();
 
@@ -124,7 +128,7 @@ pub fn wasmprof<T, FnReturn>(
     let mut name_to_i = HashMap::new();
     let mut frames = Vec::new();
     let mut samples = Vec::new();
-    let mut weights= Vec::new();
+    let mut weights = Vec::new();
     for (backtrace, weight) in backtraces {
         let mut sample = Vec::new();
         let bt_frames = backtrace.frames();
