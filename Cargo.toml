@@ -12,4 +12,4 @@ libc = "0.2.140"
 nix = { version = "0.26", default-features = false, features = ["signal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-wasmtime = { git = "https://github.com/bytecodealliance/wasmtime.git" }
+wasmtime = { version = "8.0.0" }
