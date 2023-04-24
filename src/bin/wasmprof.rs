@@ -22,9 +22,8 @@ fn main() {
     let func = instance
         .get_typed_func::<i64, i64>(store.as_context_mut(), "fib")
         .unwrap();
-    let (_, res, _) = wasmprof(
+    let (res, _) = wasmprof(
         100,
-        engine,
         &mut store,
         wasmprof::WeightUnit::Nanoseconds,
         |mut store| {
