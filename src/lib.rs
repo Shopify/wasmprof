@@ -135,7 +135,10 @@ pub fn wasmprof<T, FnReturn>(
             continue;
         }
         for frame in bt_frames {
-            let name = frame.func_name().unwrap_or("<unknown>");
+            let name = frame
+                .func_name()
+                .map(unmangle_name)
+                .unwrap_or_else(|| "<unknown>".to_string());
             let i = *name_to_i.entry(name.to_string()).or_insert_with(|| {
                 frames.push(name.to_string());
                 frames.len() - 1
@@ -152,4 +155,14 @@ pub fn wasmprof<T, FnReturn>(
         profile_data::ProfileData::new(frames, samples, Some(weights)),
         fn_return,
     )
+}
+
+fn unmangle_name(name: &str) -> String {
+    if let Ok(demangled) = rustc_demangle::try_demangle(name) {
+        demangled.to_string()
+    } else if let Ok(demangled) = cpp_demangle::Symbol::new(name) {
+        demangled.to_string()
+    } else {
+        name.to_string()
+    }
 }
