@@ -22,7 +22,7 @@ fn main() {
     let func = instance
             .get_typed_func::<i64, i64>(store.as_context_mut(), "fib")
             .unwrap();
-    let (_, res) = wasmprof(100, engine, &mut store, wasmprof::WeightUnit::Nanoseconds,|mut store| {
+    let (_, res, _) = wasmprof(100, engine, &mut store, wasmprof::WeightUnit::Nanoseconds,|mut store| {
         for _ in 0..10 {
             func.call(&mut store, 40).unwrap();
         }
