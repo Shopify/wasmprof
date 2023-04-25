@@ -4,7 +4,10 @@ pub struct CollapsedStack {
     stack: Vec<String>,
     weight: u128,
 }
-
+/// Contains the data collected by the profiler in collapsed stacks format.
+/// The main use case is to call `write_to_file` on a `CollapsedStacks` instance.
+/// The resulting file can be opened in a variety of profiling tools.
+/// The format is explained here: https://github.com/jlfwong/speedscope/wiki/Importing-from-custom-sources#brendan-greggs-collapsed-stack-format
 pub struct CollapsedStacks(Vec<CollapsedStack>);
 
 impl CollapsedStacks {
@@ -23,6 +26,10 @@ impl CollapsedStacks {
             stacks.push(CollapsedStack { stack, weight });
         }
         Self(stacks)
+    }
+
+    pub fn write_to_file(&self, path: &str) -> std::io::Result<()> {
+        std::fs::write(path, self.to_string())
     }
 }
 
