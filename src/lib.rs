@@ -12,6 +12,9 @@ static BACKTRACES: std::sync::Mutex<Vec<(wasmtime::WasmBacktrace, u128)>> =
     std::sync::Mutex::new(vec![]);
 static LAST_WEIGHT: std::sync::Mutex<u128> = std::sync::Mutex::new(0);
 
+/// A type to represent the weight unit used by the profiler.
+/// The profiler can either use the number of nanoseconds spent in each function
+/// or the amount of fuel consumed by each function.
 pub enum WeightUnit {
     Nanoseconds,
     Fuel,
@@ -34,6 +37,9 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
     });
 }
 
+/// A builder for the profiler. It allows to set the frequency at which the profiler
+/// will sample the stack and the weight unit used by the profiler.
+/// The profiler will start when the `profile` method is called.
 pub struct ProfilerBuilder<'a, T> {
     frequency: i32,
     weight_unit: WeightUnit,
@@ -59,6 +65,8 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         self
     }
 
+    /// Start the profiler and call the function `f` with the store.
+    /// It returns the value returned by `f` and the data collected by the profiler.
     pub fn profile<FnReturn>(
         self,
         f: impl FnOnce(&mut Store<T>) -> FnReturn,

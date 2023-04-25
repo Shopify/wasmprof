@@ -81,7 +81,7 @@ fn main() {
             let func = instance
                 .get_typed_func::<i32, i32>(store.as_context_mut(), "fib")
                 .unwrap();
-            func.call(store.as_context_mut(), 40).unwrap();
+            func.call(store.as_context_mut(), 40).unwrap()
         });
 
     println!("{}", res.into_collapsed_stacks());
