@@ -89,7 +89,7 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         self.store.epoch_deadline_trap();
 
         let mut backtraces = BACKTRACES.lock().unwrap();
-        let backtraces = std::mem::replace(&mut *backtraces, vec![]);
+        let backtraces = std::mem::take(&mut *backtraces);
 
         let mut name_to_i = HashMap::new();
         let mut frames = Vec::new();
