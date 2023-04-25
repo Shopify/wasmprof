@@ -18,7 +18,7 @@ impl TickerImpl {
                 Ok(_) | Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
                 Err(std::sync::mpsc::TryRecvError::Empty) => (),
             }
-            std::thread::sleep(sleep_duration);
+            spin_sleep::sleep(sleep_duration);
             if let Some(engine) = unsafe { ENGINE.as_ref() } {
                 engine.increment_epoch();
             }
