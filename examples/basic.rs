@@ -73,7 +73,7 @@ fn main() {
     let mut store = Store::new(&engine, ());
     store.add_fuel(100000000000).unwrap();
 
-    let (_, res) = wasmprof(100, engine, &mut store, wasmprof::WeightUnit::Fuel, |store| {
+    let (_, res, _) = wasmprof(100, engine, &mut store, wasmprof::WeightUnit::Fuel, |store| {
         let instance = Instance::new(store.as_context_mut(), &module, &[]).unwrap();
         let func = instance
             .get_typed_func::<i32, i32>(store.as_context_mut(), "fib")
