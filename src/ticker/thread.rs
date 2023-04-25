@@ -1,43 +1,36 @@
-use std::time::SystemTime;
+use std::time::Duration;
 
 use crate::ENGINE;
 
-use super::{Error, ReportTiming};
+use super::Error;
 
 pub struct TickerImpl {
     close_channel: std::sync::mpsc::Sender<()>,
-    start_time: SystemTime,
     start_instant: std::time::Instant,
-    frequency: i32,
 }
 
 impl TickerImpl {
-    pub fn new(frequency: i32) -> Result<Self, crate::ticker::Error> {
+    pub fn new(frequency: u32) -> Result<Self, crate::ticker::Error> {
+        let sleep_duration = Duration::from_secs_f64(1f64 / f64::from(frequency));
         let (close_channel, close_receiver) = std::sync::mpsc::channel();
         std::thread::spawn(move || loop {
             match close_receiver.try_recv() {
                 Ok(_) | Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
                 Err(std::sync::mpsc::TryRecvError::Empty) => (),
             }
-            std::thread::sleep(std::time::Duration::from_millis(1000 / frequency as u64));
+            std::thread::sleep(sleep_duration);
             if let Some(engine) = unsafe { ENGINE.as_ref() } {
                 engine.increment_epoch();
             }
         });
         Ok(Self {
             close_channel,
-            start_time: SystemTime::now(),
             start_instant: std::time::Instant::now(),
-            frequency,
         })
     }
 
-    pub fn timing(&self) -> ReportTiming {
-        ReportTiming {
-            frequency: self.frequency,
-            start_time: self.start_time,
-            duration: self.start_instant.elapsed(),
-        }
+    pub fn duration(&self) -> Duration {
+        self.start_instant.elapsed()
     }
 
     pub fn end(self) -> Result<(), crate::ticker::Error> {

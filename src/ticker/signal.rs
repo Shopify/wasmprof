@@ -1,9 +1,9 @@
 use nix::{libc, sys::signal};
-use std::os::raw::c_int;
+use std::{os::raw::c_int, time::Duration};
 
 use crate::ENGINE;
 
-use super::{Error, ReportTiming};
+use super::Error;
 
 mod timer;
 
@@ -79,15 +79,15 @@ pub struct TickerImpl {
 }
 
 impl TickerImpl {
-    pub fn new(frequency: c_int) -> Result<Self, Error> {
+    pub fn new(frequency: u32) -> Result<Self, Error> {
         register_signal_handler().map_err(|_| Error::RegisterError)?;
         Ok(Self {
             timer: timer::Timer::new(frequency),
         })
     }
 
-    pub fn timing(&self) -> ReportTiming {
-        self.timer.timing()
+    pub fn duration(&self) -> Duration {
+        self.timer.duration()
     }
 
     pub fn end(self) -> Result<(), Error> {

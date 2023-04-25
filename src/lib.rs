@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use wasmtime::{Store, WasmBacktrace};
 mod collapsed_stack;
 mod profile_data;
-mod speedscope;
 mod ticker;
 
 pub(crate) static mut ENGINE: Option<wasmtime::Engine> = None;
@@ -26,7 +25,7 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
         if let Some(ticker) = unsafe { TICKER.as_ref() } {
             let mut backtraces = BACKTRACES.lock().unwrap();
             let weight = match weight_unit {
-                WeightUnit::Nanoseconds => ticker.timing().duration.as_nanos(),
+                WeightUnit::Nanoseconds => ticker.duration().as_nanos(),
                 WeightUnit::Fuel => context.fuel_consumed().unwrap_or(0).into(),
             };
             let last_weight = *LAST_WEIGHT.lock().unwrap();
@@ -41,7 +40,7 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
 /// will sample the stack and the weight unit used by the profiler.
 /// The profiler will start when the `profile` method is called.
 pub struct ProfilerBuilder<'a, T> {
-    frequency: i32,
+    frequency: u32,
     weight_unit: WeightUnit,
     store: &'a mut wasmtime::Store<T>,
 }
@@ -55,7 +54,8 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         }
     }
 
-    pub fn frequency(mut self, frequency: i32) -> Self {
+    /// sets the frequency in Hz at which the profiler will sample the stack.
+    pub fn frequency(mut self, frequency: u32) -> Self {
         self.frequency = frequency;
         self
     }

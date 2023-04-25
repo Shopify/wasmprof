@@ -1,8 +1,6 @@
 use std::os::raw::c_int;
 use std::ptr::null_mut;
-use std::time::{Instant, SystemTime};
-
-use crate::ticker::ReportTiming;
+use std::time::{Duration, Instant};
 
 #[repr(C)]
 #[derive(Clone)]
@@ -25,17 +23,16 @@ extern "C" {
 const ITIMER_PROF: c_int = 2;
 
 pub struct Timer {
-    pub frequency: c_int,
-    pub start_time: SystemTime,
     pub start_instant: Instant,
 }
 
 impl Timer {
-    pub fn new(frequency: c_int) -> Timer {
-        let interval = 1e6 as i64 / i64::from(frequency);
+    pub fn new(frequency: u32) -> Timer {
+        let time = 1f64 / f64::from(frequency);
+        let duration = Duration::from_secs_f64(time);
         let it_interval = Timeval {
-            tv_sec: interval / 1e6 as i64,
-            tv_usec: interval % 1e6 as i64,
+            tv_sec: duration.as_secs().try_into().unwrap(),
+            tv_usec: duration.subsec_micros().into(),
         };
         let it_value = it_interval.clone();
 
@@ -51,20 +48,12 @@ impl Timer {
         };
 
         Timer {
-            frequency,
-            start_time: SystemTime::now(),
             start_instant: Instant::now(),
         }
     }
 
-    /// Returns a `ReportTiming` struct having this timer's frequency and start
-    /// time; and the time elapsed since its creation as duration.
-    pub fn timing(&self) -> ReportTiming {
-        ReportTiming {
-            frequency: self.frequency,
-            start_time: self.start_time,
-            duration: self.start_instant.elapsed(),
-        }
+    pub fn duration(&self) -> Duration {
+        self.start_instant.elapsed()
     }
 }
 

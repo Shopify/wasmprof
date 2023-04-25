@@ -1,7 +1,7 @@
-use crate::{collapsed_stack::CollapsedStacks, speedscope::SpeedscopeFile};
+use crate::collapsed_stack::CollapsedStacks;
 
 /// Contains the data collected by the profiler.
-/// It can be converted into speedscope format or collapsed stacks format.
+/// It can be converted into collapsed stacks format.
 pub struct ProfileData {
     frames: Vec<String>,
     samples: Vec<Vec<usize>>,
@@ -15,10 +15,6 @@ impl ProfileData {
             samples,
             weights,
         }
-    }
-
-    pub fn into_speedscope(self) -> SpeedscopeFile {
-        SpeedscopeFile::new(self.frames, self.samples, self.weights)
     }
 
     pub fn into_collapsed_stacks(self) -> CollapsedStacks {
