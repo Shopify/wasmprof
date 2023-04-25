@@ -3,10 +3,6 @@ name = "wasmprof"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "wasmprof"
-path = "src/bin/wasmprof.rs"
-
 [dependencies]
 cpp_demangle = "0.4.1"
 libc = "0.2.140"

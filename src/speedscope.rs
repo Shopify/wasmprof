@@ -2,6 +2,10 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+/// The schema of the speedscope file.
+/// The main use cases is to call `write_to_file` on a `SpeedscopeFile` instance.
+/// See https://www.speedscope.app/file-format-schema.json for more information.
+/// Having written this to a file, you can open it in speedscope.
 #[derive(Serialize, Deserialize)]
 pub struct SpeedscopeFile {
     #[serde(rename = "$schema")]
@@ -74,6 +78,10 @@ impl SpeedscopeFile {
 
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap()
+    }
+
+    pub fn write_to_file(&self, path: &str) -> Result<(), std::io::Error> {
+        std::fs::write(path, self.to_json())
     }
 }
 
