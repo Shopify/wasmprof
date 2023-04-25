@@ -17,8 +17,7 @@ let builder = builder
 
 // finally we can start profiling
 builder.profile(|store| {
-    // here you would invoke some wasm function though wasmtime
-    // like:
+    // here you would invoke some wasm function though wasmtime, something like this:
     let func = instance
                 .get_typed_func::<i32, i32>(store.as_context_mut(), "fib")
                 .unwrap();
