@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use wasmprof::wasmprof;
+use wasmprof::ProfilerBuilder;
 use wasmtime::{AsContextMut, Config, Engine, Instance, Module, Store};
 
 fn main() {
@@ -22,16 +22,14 @@ fn main() {
     let func = instance
         .get_typed_func::<i64, i64>(store.as_context_mut(), "fib")
         .unwrap();
-    let (res, _) = wasmprof(
-        100,
-        &mut store,
-        wasmprof::WeightUnit::Nanoseconds,
-        |mut store| {
+
+    let (_, res) = ProfilerBuilder::new(&mut store)
+        .frequency(100)
+        .profile(|mut store| {
             for _ in 0..10 {
                 func.call(&mut store, 40).unwrap();
             }
-        },
-    );
+        });
 
     let mut result_file = std::fs::File::create("wasmprof.data").unwrap();
     write!(&mut result_file, "{}", res.into_collapsed_stacks()).unwrap();

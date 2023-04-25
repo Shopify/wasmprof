@@ -1,4 +1,4 @@
-use wasmprof::wasmprof;
+use wasmprof::ProfilerBuilder;
 use wasmtime::{AsContextMut, Config, Engine, Instance, Module, Store};
 
 fn main() {
@@ -73,18 +73,16 @@ fn main() {
     let mut store = Store::new(&engine, ());
     store.add_fuel(100000000000).unwrap();
 
-    let (res, _) = wasmprof(
-        100,
-        &mut store,
-        wasmprof::WeightUnit::Fuel,
-        |store| {
+    let (_, res) = ProfilerBuilder::new(&mut store)
+        .frequency(100)
+        .weight_unit(wasmprof::WeightUnit::Fuel)
+        .profile(|store| {
             let instance = Instance::new(store.as_context_mut(), &module, &[]).unwrap();
             let func = instance
                 .get_typed_func::<i32, i32>(store.as_context_mut(), "fib")
                 .unwrap();
             func.call(store.as_context_mut(), 40).unwrap();
-        },
-    );
+        });
 
     println!("{}", res.into_collapsed_stacks());
 }
