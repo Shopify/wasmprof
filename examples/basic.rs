@@ -73,9 +73,8 @@ fn main() {
     let mut store = Store::new(&engine, ());
     store.add_fuel(100000000000).unwrap();
 
-    let (_, res, _) = wasmprof(
+    let (res, _) = wasmprof(
         100,
-        engine,
         &mut store,
         wasmprof::WeightUnit::Fuel,
         |store| {

@@ -87,11 +87,10 @@ pub enum WeightUnit {
 
 pub fn wasmprof<T, FnReturn>(
     frequency: c_int,
-    engine: wasmtime::Engine,
     store: &mut wasmtime::Store<T>,
     weight_unit: WeightUnit,
     f: impl FnOnce(&mut Store<T>) -> FnReturn,
-) -> (wasmtime::Engine, profile_data::ProfileData, FnReturn) {
+) -> (profile_data::ProfileData, FnReturn) {
     register_signal_handler().unwrap();
     unsafe {
         TIMER = Some(timer::Timer::new(frequency));
@@ -112,7 +111,7 @@ pub fn wasmprof<T, FnReturn>(
         Ok(1)
     });
 
-    unsafe { ENGINE = Some(engine) };
+    unsafe { ENGINE = Some(store.engine().clone()) };
 
     let fn_return = f(store);
 
@@ -147,8 +146,9 @@ pub fn wasmprof<T, FnReturn>(
         samples.push(sample);
     }
 
+    unsafe { ENGINE.take() };
+
     (
-        unsafe { ENGINE.take().unwrap() },
         profile_data::ProfileData::new(frames, samples, Some(weights)),
         fn_return,
     )
