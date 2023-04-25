@@ -26,5 +26,5 @@ builder.profile(|store| {
 })
 ```
 
-A complete example can be found in the examples folder.
+A [complete example](https://github.com/Shopify/wasmprof/blob/main/examples/basic.rs) can be found in the examples folder.
 
