@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use crate::ENGINE;
 
-use super::{ReportTiming, Error};
+use super::{Error, ReportTiming};
 
 pub struct TickerImpl {
     close_channel: std::sync::mpsc::Sender<()>,
@@ -28,7 +28,7 @@ impl TickerImpl {
             close_channel,
             start_time: SystemTime::now(),
             start_instant: std::time::Instant::now(),
-            frequency
+            frequency,
         })
     }
 
@@ -41,7 +41,9 @@ impl TickerImpl {
     }
 
     pub fn end(self) -> Result<(), crate::ticker::Error> {
-        self.close_channel.send(()).map_err(|_| Error::UnregisterError)?;
+        self.close_channel
+            .send(())
+            .map_err(|_| Error::UnregisterError)?;
         Ok(())
     }
 }
