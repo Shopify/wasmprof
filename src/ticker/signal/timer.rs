@@ -1,6 +1,8 @@
 use std::os::raw::c_int;
 use std::ptr::null_mut;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Instant, SystemTime};
+
+use crate::ticker::ReportTiming;
 
 #[repr(C)]
 #[derive(Clone)]
@@ -83,26 +85,5 @@ impl Drop for Timer {
                 null_mut(),
             )
         };
-    }
-}
-
-/// Timing metadata for a collected report.
-#[derive(Clone)]
-pub struct ReportTiming {
-    /// Frequency at which samples were collected.
-    pub frequency: i32,
-    /// Collection start time.
-    pub start_time: SystemTime,
-    /// Collection duration.
-    pub duration: Duration,
-}
-
-impl Default for ReportTiming {
-    fn default() -> Self {
-        Self {
-            frequency: 1,
-            start_time: SystemTime::UNIX_EPOCH,
-            duration: Default::default(),
-        }
     }
 }
