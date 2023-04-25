@@ -1,4 +1,4 @@
-use crate::{speedscope::SpeedscopeFile, collapsed_stack::CollapsedStacks};
+use crate::{collapsed_stack::CollapsedStacks, speedscope::SpeedscopeFile};
 
 pub struct ProfileData {
     frames: Vec<String>,

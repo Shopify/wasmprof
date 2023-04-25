@@ -1,5 +1,5 @@
 use wasmprof::wasmprof;
-use wasmtime::{Config, Engine, Instance, Module, Store, AsContextMut};
+use wasmtime::{AsContextMut, Config, Engine, Instance, Module, Store};
 
 fn main() {
     let mut config = Config::default();
@@ -73,13 +73,19 @@ fn main() {
     let mut store = Store::new(&engine, ());
     store.add_fuel(100000000000).unwrap();
 
-    let (_, res, _) = wasmprof(100, engine, &mut store, wasmprof::WeightUnit::Fuel, |store| {
-        let instance = Instance::new(store.as_context_mut(), &module, &[]).unwrap();
-        let func = instance
-            .get_typed_func::<i32, i32>(store.as_context_mut(), "fib")
-            .unwrap();
-        func.call(store.as_context_mut(), 40).unwrap();
-    });
+    let (_, res, _) = wasmprof(
+        100,
+        engine,
+        &mut store,
+        wasmprof::WeightUnit::Fuel,
+        |store| {
+            let instance = Instance::new(store.as_context_mut(), &module, &[]).unwrap();
+            let func = instance
+                .get_typed_func::<i32, i32>(store.as_context_mut(), "fib")
+                .unwrap();
+            func.call(store.as_context_mut(), 40).unwrap();
+        },
+    );
 
     println!("{}", res.into_collapsed_stacks());
 }
