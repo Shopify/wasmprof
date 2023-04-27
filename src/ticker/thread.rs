@@ -9,7 +9,7 @@ pub struct TickerImpl {
     start_instant: std::time::Instant,
 }
 
-impl TickerImpl {
+impl TickerImpl { boop
     pub fn new(frequency: u32) -> Result<Self, crate::ticker::Error> {
         let sleep_duration = Duration::from_secs_f64(1f64 / f64::from(frequency));
         let (close_channel, close_receiver) = std::sync::mpsc::channel();
