@@ -11,6 +11,10 @@ fn main() {
         r#"
         (module
             (export "fib" (func $fib))
+            (export "__wasmprof_stacks_test" (func $__wasmprof_stacks_test))
+            (func $__wasmprof_stacks_test (result i32)
+                (i32.const 42)
+            )
             (func $fib (param $n i32) (result i32)
              (if
               (i32.lt_s
@@ -72,12 +76,14 @@ fn main() {
 
     let mut store = Store::new(&engine, ());
     store.add_fuel(100000000000).unwrap();
+    let instance = Instance::new(store.as_context_mut(), &module, &[]).unwrap();
 
     let (_, res) = ProfilerBuilder::new(&mut store)
         .frequency(100)
+        .instance(instance.clone())
+        .add_runtimes("test".to_string())
         .weight_unit(wasmprof::WeightUnit::Fuel)
         .profile(|store| {
-            let instance = Instance::new(store.as_context_mut(), &module, &[]).unwrap();
             let func = instance
                 .get_typed_func::<i32, i32>(store.as_context_mut(), "fib")
                 .unwrap();
