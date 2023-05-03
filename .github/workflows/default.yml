@@ -9,7 +9,7 @@ on:
 jobs:
   check:
     name: Check
-    runs-on: shopify-ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -27,7 +27,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: shopify-ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -45,7 +45,7 @@ jobs:
 
   fmt:
     name: Format
-    runs-on: shopify-ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -61,7 +61,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: shopify-ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
