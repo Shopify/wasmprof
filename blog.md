@@ -19,9 +19,9 @@ The samples are then used to generate a report, which is the output of the profi
 wasmprof is a sampling profiler that works on WebAssembly programs. It's written in Rust and it's built on top of [wasmtime](https://github.com/bytecodealliance/wasmtime). wasmtime has some really nice apis which can be used to implement a profiler. The first such feature is epoch-based
 interruption. How does this work? Taken from the wasmtime docs:
 
-```
-There is a global “epoch”, which is a counter that divides time into arbitrary periods (or epochs). This counter lives on the Engine and can be incremented by calling Engine::increment_epoch. Epoch-based instrumentation works by setting a “deadline epoch”. The compiled code knows the deadline, and at certain points, checks the current epoch against that deadline. It will yield if the deadline has been reached.
-```
+> There is a global “epoch”, which is a counter that divides time into arbitrary periods (or epochs). This counter lives on the Engine and can be
+> incremented by calling Engine::increment_epoch. Epoch-based instrumentation works by setting a “deadline epoch”. The compiled code knows the deadline,
+> and at certain points, checks the current epoch against that deadline. It will yield if the deadline has been reached.
 
 What this means is that we can increase the epoch and the running program inside of wasmtime will yield back to the executor once the deadline is
 reached. Furthermore, we can register a custom callback function that is called when the epoch deadline is reached! This is exactly what wasmprof does.
