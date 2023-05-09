@@ -2,6 +2,11 @@
 name = "wasmprof"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "wasmprof allows to profile code running inside of wasmtime"
+homepage = "https://github.com/Shopify/wasmprof"
+keywords = ["wasm", "wasmtime", "profiler"]
+categories = ["wasm", "development-tools::profiling"]
 
 [dependencies]
 cpp_demangle = "0.4.1"
