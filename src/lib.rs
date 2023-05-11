@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
-use wasmtime::{Store, WasmBacktrace, AsContextMut};
+use wasmtime::{AsContextMut, Store, WasmBacktrace};
 mod collapsed_stack;
 mod profile_data;
 mod ticker;
 
 pub(crate) static mut ENGINE: Option<wasmtime::Engine> = None;
 static mut TICKER: Option<ticker::Ticker> = None;
-static BACKTRACES: std::sync::Mutex<Vec<(wasmtime::WasmBacktrace, u128)>> =
-    std::sync::Mutex::new(vec![]);
+static BACKTRACES: std::sync::Mutex<Option<HashMap<String, Vec<Sample>>>> =
+    std::sync::Mutex::new(None);
 static LAST_WEIGHT: std::sync::Mutex<u128> = std::sync::Mutex::new(0);
 
 #[derive(Clone, Copy)]
@@ -18,6 +18,48 @@ static LAST_WEIGHT: std::sync::Mutex<u128> = std::sync::Mutex::new(0);
 pub enum WeightUnit {
     Nanoseconds,
     Fuel,
+}
+
+pub enum Backtrace {
+    Native(WasmBacktrace),
+    Runtime(Vec<String>),
+}
+
+impl Backtrace {
+    pub fn from_wasm_backtrace(backtrace: WasmBacktrace) -> Self {
+        Backtrace::Native(backtrace)
+    }
+
+    pub fn from_runtime_backtrace(backtrace: Vec<String>) -> Self {
+        Backtrace::Runtime(backtrace)
+    }
+
+    pub fn frames(&self) -> Vec<String> {
+        match self {
+            Backtrace::Native(backtrace) => backtrace.frames().iter().map(|frame| {
+                frame
+                    .func_name()
+                    .map(unmangle_name)
+                    .unwrap_or_else(|| "<unknown>".to_string())
+            }).collect(),
+            Backtrace::Runtime(backtrace) => backtrace.clone(),
+        }
+    }
+}
+
+pub struct Sample {
+    backtrace: Backtrace,
+    weight: u128,
+}
+
+impl Sample {
+    fn backtrace(&self) -> &Backtrace {
+        &self.backtrace
+    }
+
+    fn weight(&self) -> u128 {
+        self.weight
+    }
 }
 
 /// A builder for the profiler. It allows to set the frequency at which the profiler
@@ -31,21 +73,74 @@ pub struct ProfilerBuilder<'a, T> {
     runtimes: Vec<String>,
 }
 
-fn read_runtimes_stack_traces(mut context: impl AsContextMut, instance: &mut Option<wasmtime::Instance>, runtimes: &[String]) {
+fn read_runtimes_stack_traces(
+    mut context: impl AsContextMut,
+    instance: &mut Option<wasmtime::Instance>,
+    runtimes: &[String],
+    backtraces: &mut HashMap<String, Vec<Sample>>,
+    weight: u128,
+) {
     if let Some(instance) = instance {
         for runtime in runtimes {
-            let stack_getter = instance.get_typed_func::<(), i32>(context.as_context_mut(), format!("__wasmprof_stacks_{}", runtime).as_str());
-            if let Ok(stack_getter) = stack_getter {
-                let stack = stack_getter.call(context.as_context_mut(), ());
-                match stack {
-                    Ok(stack) => {
-                        println!("{}: {:?}", runtime, stack);
-                    },
-                    Err(_) => {
-                        println!("{}: no stack", runtime);
-                    }
+            let stack_creator = instance.get_typed_func::<(), i32>(
+                context.as_context_mut(),
+                format!("__{}_wasmprof_stacks_create", runtime).as_str(),
+            );
+            let stack_ptr_getter = instance.get_typed_func::<i32, i32>(
+                context.as_context_mut(),
+                format!("__{}_wasmprof_stacks_get", runtime).as_str(),
+            );
+            let stack_len_getter = instance.get_typed_func::<i32, i32>(
+                context.as_context_mut(),
+                format!("__{}_wasmprof_stacks_len", runtime).as_str(),
+            );
+            let stack_destroyer = instance.get_typed_func::<i32, ()>(
+                context.as_context_mut(),
+                format!("__{}_wasmprof_stacks_destroy", runtime).as_str(),
+            );
+
+            match (
+                stack_creator,
+                stack_ptr_getter,
+                stack_len_getter,
+                stack_destroyer,
+            ) {
+                (
+                    Ok(stack_creator),
+                    Ok(stack_ptr_getter),
+                    Ok(stack_len_getter),
+                    Ok(stack_destroyer),
+                ) => {
+                    let stack = stack_creator.call(context.as_context_mut(), ()).unwrap();
+                    let ptr = stack_ptr_getter
+                        .call(context.as_context_mut(), stack)
+                        .unwrap();
+                    let len = stack_len_getter
+                        .call(context.as_context_mut(), stack)
+                        .unwrap();
+                    let mem = instance
+                        .get_memory(context.as_context_mut(), "memory")
+                        .unwrap();
+                    let mut buf = vec![0u8; len as usize];
+                    mem.read(context.as_context_mut(), ptr as usize, &mut buf[..])
+                        .unwrap();
+                    let read: Vec<String> = rmp_serde::from_slice(&buf).unwrap();
+
+                    let backtrace = backtraces
+                        .entry(runtime.to_string())
+                        .or_insert_with(|| vec![]);
+                    backtrace.push(Sample {
+                        backtrace: Backtrace::from_runtime_backtrace(read),
+                        weight,
+                    });
+
+                    stack_destroyer
+                        .call(context.as_context_mut(), stack)
+                        .unwrap();
                 }
-                println!("{}: {:?}", runtime, stack);
+                _ => {
+                    println!("{}: no stack", runtime);
+                }
             }
         }
     }
@@ -98,6 +193,8 @@ impl<'a, T> ProfilerBuilder<'a, T> {
             TICKER = Some(ticker);
         }
         unsafe { ENGINE = Some(self.store.engine().clone()) };
+        *(BACKTRACES.lock().unwrap()) =
+            Some(HashMap::from_iter([("native".to_string(), Vec::new())]));
 
         self.setup_store();
 
@@ -111,23 +208,23 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         self.store.epoch_deadline_trap();
 
         let mut backtraces = BACKTRACES.lock().unwrap();
-        let backtraces = std::mem::take(&mut *backtraces);
+        let backtraces = backtraces.as_mut().unwrap();
+        let backtraces = std::mem::take(backtraces);
+        let native_backtraces = backtraces.get("native").unwrap();
 
         let mut name_to_i = HashMap::new();
         let mut frames = Vec::new();
         let mut samples = Vec::new();
         let mut weights = Vec::new();
-        for (backtrace, weight) in backtraces {
+        for sample in native_backtraces {
+            let backtrace = sample.backtrace();
+            let weight = sample.weight();
             let mut sample = Vec::new();
             let bt_frames = backtrace.frames();
             if bt_frames.is_empty() {
                 continue;
             }
-            for frame in bt_frames {
-                let name = frame
-                    .func_name()
-                    .map(unmangle_name)
-                    .unwrap_or_else(|| "<unknown>".to_string());
+            for name in bt_frames {
                 let i = *name_to_i.entry(name.to_string()).or_insert_with(|| {
                     frames.push(name.to_string());
                     frames.len() - 1
@@ -154,15 +251,30 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         self.store.epoch_deadline_callback(move |mut context| {
             if let Some(ticker) = unsafe { TICKER.as_ref() } {
                 let mut backtraces = BACKTRACES.lock().unwrap();
+                let backtraces = backtraces.as_mut().unwrap();
                 let weight = match weight_unit {
                     WeightUnit::Nanoseconds => ticker.duration().as_nanos(),
                     WeightUnit::Fuel => context.fuel_consumed().unwrap_or(0).into(),
                 };
                 let last_weight = *LAST_WEIGHT.lock().unwrap();
                 *LAST_WEIGHT.lock().unwrap() = weight;
-                backtraces.push((WasmBacktrace::capture(&context), weight - last_weight));
+                let weight = weight - last_weight;
+                let backtrace = Backtrace::Native(WasmBacktrace::capture(&context));
+                backtraces
+                    .get_mut("native")
+                    .unwrap()
+                    .push(Sample { backtrace, weight });
+                context.set_epoch_deadline(100000);
+                // read_runtimes_stack_traces(
+                //     context.as_context_mut(),
+                //     &mut instance,
+                //     &runtimes,
+                //     backtraces,
+                //     weight,
+                // );
+                context.set_epoch_deadline(0);
             }
-            read_runtimes_stack_traces(context.as_context_mut(), &mut instance, &runtimes);
+
             Ok(1)
         });
     }
