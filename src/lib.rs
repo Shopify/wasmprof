@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use wasmtime::{Store, WasmBacktrace};
+use wasmtime::{Store, UpdateDeadline, WasmBacktrace};
 mod collapsed_stack;
 mod profile_data;
 mod ticker;
@@ -32,7 +32,7 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
             *LAST_WEIGHT.lock().unwrap() = weight;
             backtraces.push((WasmBacktrace::capture(&context), weight - last_weight));
         }
-        Ok(1)
+        Ok(UpdateDeadline::Continue(1))
     });
 }
 
