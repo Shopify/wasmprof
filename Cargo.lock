@@ -134,9 +134,9 @@ dependencies = [
 
 [[package]]
 name = "cpp_demangle"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c76f98bdfc7f66172e6c7065f981ebb576ffc903fe4c0561d9f0c2509226dc6"
+checksum = "7e8227005286ec39567949b33df9896bcadfa6051bccca2488129f108ca23119"
 dependencies = [
  "cfg-if",
 ]
@@ -1216,7 +1216,7 @@ dependencies = [
 name = "wasmprof"
 version = "0.3.0"
 dependencies = [
- "cpp_demangle 0.4.1",
+ "cpp_demangle 0.4.3",
  "libc",
  "nix",
  "rustc-demangle",
