@@ -27,3 +27,4 @@ builder.profile(|store| {
 
 A [complete example](https://github.com/Shopify/wasmprof/blob/main/examples/basic.rs) can be found in the examples folder.
 
+The produced `.perf` files are viewable in [speedscope](https://speedscope.shopify.io/)
