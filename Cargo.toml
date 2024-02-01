@@ -13,7 +13,7 @@ cpp_demangle = "0.4.1"
 libc = "0.2.142"
 nix = { version = "0.26", default-features = false, features = ["signal"] }
 rustc-demangle = "0.1.23"
-spin_sleep = "1.1.1"
+spin_sleep = "1.2.0"
 wasmtime = ">= 10.0.0, < 15.0.0"
 
 [features]
