@@ -28,11 +28,13 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
     store.epoch_deadline_callback(move |context| {
         if let Some(ticker) = unsafe { TICKER.as_ref() } {
             let mut backtraces = BACKTRACES.lock().unwrap();
-            let current_fuel = context.get_fuel().unwrap();
-            let fuel_consumption = fuel_max.saturating_sub(current_fuel);
             let weight = match weight_unit {
                 WeightUnit::Nanoseconds => ticker.duration().as_nanos(),
-                WeightUnit::Fuel => fuel_consumption.into(),
+                WeightUnit::Fuel => {
+                    let current_fuel = context.get_fuel().unwrap();
+                    let fuel_consumption = fuel_max.saturating_sub(current_fuel);
+                    fuel_consumption.into()
+                }
             };
             let last_weight = *LAST_WEIGHT.lock().unwrap();
             *LAST_WEIGHT.lock().unwrap() = weight;
