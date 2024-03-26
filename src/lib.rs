@@ -21,19 +21,42 @@ pub enum WeightUnit {
 
 fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
     store.set_epoch_deadline(1);
-    store.epoch_deadline_callback(move |context| {
-        if let Some(ticker) = unsafe { TICKER.as_ref() } {
-            let mut backtraces = BACKTRACES.lock().unwrap();
-            let weight = match weight_unit {
-                WeightUnit::Nanoseconds => ticker.duration().as_nanos(),
-                WeightUnit::Fuel => context.fuel_consumed().unwrap_or(0).into(),
-            };
-            let last_weight = *LAST_WEIGHT.lock().unwrap();
-            *LAST_WEIGHT.lock().unwrap() = weight;
-            backtraces.push((WasmBacktrace::capture(&context), weight - last_weight));
+
+    match weight_unit {
+        WeightUnit::Fuel => {
+            let fuel_max = store
+                .get_fuel()
+                .expect("Fuel must be set prior to calling setup_store");
+
+            store.epoch_deadline_callback(move |context| {
+                let current_fuel = context.get_fuel().expect("Failed to get fuel from context");
+                let fuel_consumption = fuel_max.saturating_sub(current_fuel);
+                let weight = fuel_consumption.into();
+
+                add_weighted_backtrace(context, weight);
+
+                Ok(UpdateDeadline::Continue(1))
+            });
         }
-        Ok(UpdateDeadline::Continue(1))
-    });
+        WeightUnit::Nanoseconds => {
+            store.epoch_deadline_callback(move |context| {
+                if let Some(ticker) = unsafe { TICKER.as_ref() } {
+                    let weight = ticker.duration().as_nanos();
+
+                    add_weighted_backtrace(context, weight);
+                }
+                Ok(UpdateDeadline::Continue(1))
+            });
+        }
+    }
+}
+
+fn add_weighted_backtrace<T>(context: wasmtime::StoreContextMut<'_, T>, weight: u128) {
+    let mut backtraces = BACKTRACES.lock().unwrap();
+
+    let last_weight = *LAST_WEIGHT.lock().unwrap();
+    *LAST_WEIGHT.lock().unwrap() = weight;
+    backtraces.push((WasmBacktrace::capture(context), weight - last_weight));
 }
 
 /// A builder for the profiler. It allows to set the frequency at which the profiler
