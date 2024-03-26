@@ -24,7 +24,9 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
 
     match weight_unit {
         WeightUnit::Fuel => {
-            let fuel_max = store.get_fuel().expect("Fuel must be set prior to calling setup_store");
+            let fuel_max = store
+                .get_fuel()
+                .expect("Fuel must be set prior to calling setup_store");
 
             store.epoch_deadline_callback(move |context| {
                 let current_fuel = context.get_fuel().expect("Failed to get fuel from context");
@@ -35,7 +37,7 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
 
                 Ok(UpdateDeadline::Continue(1))
             });
-        },
+        }
         WeightUnit::Nanoseconds => {
             store.epoch_deadline_callback(move |context| {
                 if let Some(ticker) = unsafe { TICKER.as_ref() } {
@@ -54,7 +56,7 @@ fn add_weighted_backtrace<T>(context: wasmtime::StoreContextMut<'_, T>, weight: 
 
     let last_weight = *LAST_WEIGHT.lock().unwrap();
     *LAST_WEIGHT.lock().unwrap() = weight;
-    backtraces.push((WasmBacktrace::capture(&context), weight - last_weight));
+    backtraces.push((WasmBacktrace::capture(context), weight - last_weight));
 }
 
 /// A builder for the profiler. It allows to set the frequency at which the profiler
