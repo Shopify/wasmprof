@@ -71,7 +71,7 @@ fn main() {
     .unwrap();
 
     let mut store = Store::new(&engine, ());
-    store.add_fuel(100000000000).unwrap();
+    store.set_fuel(100000000000).unwrap();
 
     let (_, res) = ProfilerBuilder::new(&mut store)
         .frequency(100)
