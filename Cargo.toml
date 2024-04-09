@@ -9,7 +9,7 @@ keywords = ["wasm", "wasmtime", "profiler"]
 categories = ["wasm", "development-tools::profiling"]
 
 [dependencies]
-cpp_demangle = "0.4.1"
+cpp_demangle = "0.4.3"
 libc = "0.2.142"
 nix = { version = "0.26", default-features = false, features = ["signal"] }
 rustc-demangle = "0.1.23"
