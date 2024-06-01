@@ -12,7 +12,7 @@ categories = ["wasm", "development-tools::profiling"]
 cpp_demangle = "0.4.1"
 libc = "0.2.142"
 nix = { version = "0.26", default-features = false, features = ["signal"] }
-rustc-demangle = "0.1.23"
+rustc-demangle = "0.1.24"
 spin_sleep = "1.1.1"
 wasmtime = ">= 15.0.0, < 20.0.0"
 
