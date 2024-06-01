@@ -14,7 +14,7 @@ libc = "0.2.142"
 nix = { version = "0.26", default-features = false, features = ["signal"] }
 rustc-demangle = "0.1.23"
 spin_sleep = "1.1.1"
-wasmtime = ">= 15.0.0, < 20.0.0"
+wasmtime = ">= 15.0.0, < 22.0.0"
 
 [features]
 perf-event = []
