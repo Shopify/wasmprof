@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
+use profile_data::FrameData;
 use wasmtime::{Store, UpdateDeadline, WasmBacktrace};
 mod collapsed_stack;
 mod profile_data;
+mod speedscope;
 mod ticker;
 
 pub(crate) static mut ENGINE: Option<wasmtime::Engine> = None;
@@ -14,6 +17,7 @@ static LAST_WEIGHT: std::sync::Mutex<u128> = std::sync::Mutex::new(0);
 /// A type to represent the weight unit used by the profiler.
 /// The profiler can either use the number of nanoseconds spent in each function
 /// or the amount of fuel consumed by each function.
+#[derive(Copy, Clone)]
 pub enum WeightUnit {
     Nanoseconds,
     Fuel,
@@ -66,6 +70,7 @@ pub struct ProfilerBuilder<'a, T> {
     frequency: u32,
     weight_unit: WeightUnit,
     store: &'a mut wasmtime::Store<T>,
+    binary_path: Option<PathBuf>,
 }
 
 impl<'a, T> ProfilerBuilder<'a, T> {
@@ -74,6 +79,7 @@ impl<'a, T> ProfilerBuilder<'a, T> {
             frequency: 1000,
             weight_unit: WeightUnit::Nanoseconds,
             store,
+            binary_path: None,
         }
     }
 
@@ -85,6 +91,11 @@ impl<'a, T> ProfilerBuilder<'a, T> {
 
     pub fn weight_unit(mut self, weight_unit: WeightUnit) -> Self {
         self.weight_unit = weight_unit;
+        self
+    }
+
+    pub fn binary_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.binary_path = Some(path.into());
         self
     }
 
@@ -125,12 +136,9 @@ impl<'a, T> ProfilerBuilder<'a, T> {
                 continue;
             }
             for frame in bt_frames {
-                let name = frame
-                    .func_name()
-                    .map(unmangle_name)
-                    .unwrap_or_else(|| "<unknown>".to_string());
-                let i = *name_to_i.entry(name.to_string()).or_insert_with(|| {
-                    frames.push(name.to_string());
+                let frame_data = FrameData::from((frame, self.binary_path.as_ref()));
+                let i = *name_to_i.entry(frame_data.name.clone()).or_insert_with(|| {
+                    frames.push(frame_data);
                     frames.len() - 1
                 });
                 sample.push(i);
@@ -139,21 +147,13 @@ impl<'a, T> ProfilerBuilder<'a, T> {
             samples.push(sample);
         }
 
+        let profile_data = profile_data::ProfileData::new(frames, samples, Some(weights), self.weight_unit, self.binary_path.clone());
+
         unsafe { ENGINE.take() };
 
-        (
-            fn_return,
-            profile_data::ProfileData::new(frames, samples, Some(weights)),
-        )
+        (fn_return, profile_data)
     }
 }
 
-fn unmangle_name(name: &str) -> String {
-    if let Ok(demangled) = rustc_demangle::try_demangle(name) {
-        demangled.to_string()
-    } else if let Ok(demangled) = cpp_demangle::Symbol::new(name) {
-        demangled.to_string()
-    } else {
-        name.to_string()
-    }
-}
+pub use profile_data::ProfileData;
+pub use speedscope::SpeedscopeFile;
