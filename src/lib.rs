@@ -40,6 +40,7 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
         }
         WeightUnit::Nanoseconds => {
             store.epoch_deadline_callback(move |context| {
+                #[allow(static_mut_refs)]
                 if let Some(ticker) = unsafe { TICKER.as_ref() } {
                     let weight = ticker.duration().as_nanos();
 
@@ -104,6 +105,7 @@ impl<'a, T> ProfilerBuilder<'a, T> {
 
         let fn_return = f(self.store);
 
+        #[allow(static_mut_refs)]
         let ticker = unsafe { TICKER.take() };
         if let Some(ticker) = ticker {
             ticker.end().unwrap();
@@ -139,7 +141,10 @@ impl<'a, T> ProfilerBuilder<'a, T> {
             samples.push(sample);
         }
 
-        unsafe { ENGINE.take() };
+        unsafe {
+            #[allow(static_mut_refs)]
+            ENGINE.take()
+        };
 
         (
             fn_return,
