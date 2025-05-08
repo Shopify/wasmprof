@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "wasmprof"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "cpp_demangle",
  "libc",
