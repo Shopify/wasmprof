@@ -4,7 +4,7 @@ version = "0.10.0"
 edition = "2021"
 license = "MIT"
 description = "wasmprof allows to profile code running inside of wasmtime"
-homepage = "https://github.com/Shopify/wasmprof"
+repository = "https://github.com/Shopify/wasmprof"
 keywords = ["wasm", "wasmtime", "profiler"]
 categories = ["wasm", "development-tools::profiling"]
 
