@@ -63,7 +63,7 @@ fn add_weighted_backtrace<T>(context: wasmtime::StoreContextMut<'_, T>, weight: 
 /// A builder for the profiler. It allows to set the frequency at which the profiler
 /// will sample the stack and the weight unit used by the profiler.
 /// The profiler will start when the `profile` method is called.
-pub struct ProfilerBuilder<'a, T> {
+pub struct ProfilerBuilder<'a, T: 'static> {
     frequency: u32,
     weight_unit: WeightUnit,
     store: &'a mut wasmtime::Store<T>,
