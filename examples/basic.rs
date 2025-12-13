@@ -13,26 +13,27 @@ fn main() {
             (export "fib" (func $fib))
             (func $fib (param $n i32) (result i32)
              (if
+              (result i32)
               (i32.lt_s
-               (get_local $n)
+               (local.get $n)
                (i32.const 2)
               )
-              (return
+              (then
                (i32.const 1)
               )
-             )
-             (return
-              (i32.add
-               (call $fib
-                (i32.sub
-                 (get_local $n)
-                 (i32.const 2)
+              (else
+               (i32.add
+                (call $fib
+                 (i32.sub
+                  (local.get $n)
+                  (i32.const 2)
+                 )
                 )
-               )
-               (call $fib2
-                (i32.sub
-                 (get_local $n)
-                 (i32.const 1)
+                (call $fib2
+                 (i32.sub
+                  (local.get $n)
+                  (i32.const 1)
+                 )
                 )
                )
               )
@@ -40,26 +41,27 @@ fn main() {
             )
             (func $fib2 (param $n i32) (result i32)
              (if
+              (result i32)
               (i32.lt_s
-               (get_local $n)
+               (local.get $n)
                (i32.const 2)
               )
-              (return
+              (then
                (i32.const 1)
               )
-             )
-             (return
-              (i32.add
-               (call $fib2
-                (i32.sub
-                 (get_local $n)
-                 (i32.const 2)
+              (else
+               (i32.add
+                (call $fib2
+                 (i32.sub
+                  (local.get $n)
+                  (i32.const 2)
+                 )
                 )
-               )
-               (call $fib
-                (i32.sub
-                 (get_local $n)
-                 (i32.const 1)
+                (call $fib
+                 (i32.sub
+                  (local.get $n)
+                  (i32.const 1)
+                 )
                 )
                )
               )
