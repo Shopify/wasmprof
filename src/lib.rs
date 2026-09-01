@@ -156,9 +156,40 @@ impl<'a, T> ProfilerBuilder<'a, T> {
 fn unmangle_name(name: &str) -> String {
     if let Ok(demangled) = rustc_demangle::try_demangle(name) {
         demangled.to_string()
-    } else if let Ok(demangled) = cpp_demangle::Symbol::new(name) {
-        demangled.to_string()
+    } else if let Ok(cpp_symbol) = cpp_demangle::Symbol::new(name) {
+        cpp_symbol.demangle().unwrap_or_else(|_| name.to_string())
     } else {
         name.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unmangle_name;
+
+    #[test]
+    fn unmangles_rust_symbols() {
+        assert_eq!(unmangle_name("_ZN4testE"), "test");
+    }
+
+    #[test]
+    fn unmangles_cpp_symbols() {
+        assert_eq!(
+            unmangle_name("_ZN5space3fooEibc"),
+            "space::foo(int, bool, char)"
+        );
+    }
+
+    #[test]
+    fn preserves_unmangled_symbols() {
+        assert_eq!(
+            unmangle_name("not_a_mangled_symbol"),
+            "not_a_mangled_symbol"
+        );
+    }
+
+    #[test]
+    fn preserves_symbols_that_fail_cpp_parsing() {
+        assert_eq!(unmangle_name("_Z"), "_Z");
     }
 }

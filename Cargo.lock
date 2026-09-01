@@ -119,6 +119,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpp_demangle"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0667304c32ea56cb4cd6d2d7c0cfe9a2f8041229db8c033af7f8d69492429def"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1087,7 +1096,7 @@ dependencies = [
 name = "wasmprof"
 version = "0.12.0"
 dependencies = [
- "cpp_demangle",
+ "cpp_demangle 0.5.1",
  "libc",
  "nix",
  "rustc-demangle",
@@ -1157,7 +1166,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fd1d43cfaa1a0859d2f4fccc15e7e571e2a88b357e81bc88ba6c501b83d925d"
 dependencies = [
  "anyhow",
- "cpp_demangle",
+ "cpp_demangle 0.4.4",
  "cranelift-bitset",
  "cranelift-entity",
  "gimli",
