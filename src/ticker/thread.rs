@@ -19,6 +19,7 @@ impl TickerImpl {
                 Err(std::sync::mpsc::TryRecvError::Empty) => (),
             }
             spin_sleep::sleep(sleep_duration);
+            #[allow(static_mut_refs)]
             if let Some(engine) = unsafe { ENGINE.as_ref() } {
                 engine.increment_epoch();
             }

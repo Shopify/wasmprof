@@ -40,6 +40,7 @@ fn setup_store<T>(store: &mut Store<T>, weight_unit: WeightUnit) {
         }
         WeightUnit::Nanoseconds => {
             store.epoch_deadline_callback(move |context| {
+                #[allow(static_mut_refs)]
                 if let Some(ticker) = unsafe { TICKER.as_ref() } {
                     let weight = ticker.duration().as_nanos();
 
@@ -62,7 +63,7 @@ fn add_weighted_backtrace<T>(context: wasmtime::StoreContextMut<'_, T>, weight: 
 /// A builder for the profiler. It allows to set the frequency at which the profiler
 /// will sample the stack and the weight unit used by the profiler.
 /// The profiler will start when the `profile` method is called.
-pub struct ProfilerBuilder<'a, T> {
+pub struct ProfilerBuilder<'a, T: 'static> {
     frequency: u32,
     weight_unit: WeightUnit,
     store: &'a mut wasmtime::Store<T>,
@@ -104,6 +105,7 @@ impl<'a, T> ProfilerBuilder<'a, T> {
 
         let fn_return = f(self.store);
 
+        #[allow(static_mut_refs)]
         let ticker = unsafe { TICKER.take() };
         if let Some(ticker) = ticker {
             ticker.end().unwrap();
@@ -139,7 +141,10 @@ impl<'a, T> ProfilerBuilder<'a, T> {
             samples.push(sample);
         }
 
-        unsafe { ENGINE.take() };
+        unsafe {
+            #[allow(static_mut_refs)]
+            ENGINE.take()
+        };
 
         (
             fn_return,
@@ -151,9 +156,40 @@ impl<'a, T> ProfilerBuilder<'a, T> {
 fn unmangle_name(name: &str) -> String {
     if let Ok(demangled) = rustc_demangle::try_demangle(name) {
         demangled.to_string()
-    } else if let Ok(demangled) = cpp_demangle::Symbol::new(name) {
-        demangled.to_string()
+    } else if let Ok(cpp_symbol) = cpp_demangle::Symbol::new(name) {
+        cpp_symbol.demangle().unwrap_or_else(|_| name.to_string())
     } else {
         name.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unmangle_name;
+
+    #[test]
+    fn unmangles_rust_symbols() {
+        assert_eq!(unmangle_name("_ZN4testE"), "test");
+    }
+
+    #[test]
+    fn unmangles_cpp_symbols() {
+        assert_eq!(
+            unmangle_name("_ZN5space3fooEibc"),
+            "space::foo(int, bool, char)"
+        );
+    }
+
+    #[test]
+    fn preserves_unmangled_symbols() {
+        assert_eq!(
+            unmangle_name("not_a_mangled_symbol"),
+            "not_a_mangled_symbol"
+        );
+    }
+
+    #[test]
+    fn preserves_symbols_that_fail_cpp_parsing() {
+        assert_eq!(unmangle_name("_Z"), "_Z");
     }
 }
