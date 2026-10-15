@@ -22,9 +22,9 @@ pub struct Ticker {
 }
 
 impl Ticker {
-    pub fn new(frequency: u32) -> Result<Self, Error> {
+    pub fn new(frequency: u32, engine: wasmtime::Engine) -> Result<Self, Error> {
         Ok(Self {
-            ticker_impl: TickerImpl::new(frequency)?,
+            ticker_impl: TickerImpl::new(frequency, engine)?,
         })
     }
 

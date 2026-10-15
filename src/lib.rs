@@ -1,15 +1,14 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Mutex};
 
 use wasmtime::{Store, UpdateDeadline, WasmBacktrace};
 mod collapsed_stack;
 mod profile_data;
 mod ticker;
 
-pub(crate) static mut ENGINE: Option<wasmtime::Engine> = None;
 static mut TICKER: Option<ticker::Ticker> = None;
-static BACKTRACES: std::sync::Mutex<Vec<(wasmtime::WasmBacktrace, u128)>> =
-    std::sync::Mutex::new(vec![]);
-static LAST_WEIGHT: std::sync::Mutex<u128> = std::sync::Mutex::new(0);
+static ACTIVE_PROFILE: Mutex<()> = Mutex::new(());
+static BACKTRACES: Mutex<Vec<(wasmtime::WasmBacktrace, u128)>> = Mutex::new(vec![]);
+static LAST_WEIGHT: Mutex<u128> = Mutex::new(0);
 
 /// A type to represent the weight unit used by the profiler.
 /// The profiler can either use the number of nanoseconds spent in each function
@@ -95,11 +94,13 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         self,
         f: impl FnOnce(&mut Store<T>) -> FnReturn,
     ) -> (FnReturn, profile_data::ProfileData) {
-        let ticker = ticker::Ticker::new(self.frequency).unwrap();
+        let _active_profile = ACTIVE_PROFILE
+            .try_lock()
+            .expect("only one profiler can be active at a time");
+        let ticker = ticker::Ticker::new(self.frequency, self.store.engine().clone()).unwrap();
         unsafe {
             TICKER = Some(ticker);
         }
-        unsafe { ENGINE = Some(self.store.engine().clone()) };
 
         setup_store(self.store, self.weight_unit);
 
@@ -141,11 +142,6 @@ impl<'a, T> ProfilerBuilder<'a, T> {
             samples.push(sample);
         }
 
-        unsafe {
-            #[allow(static_mut_refs)]
-            ENGINE.take()
-        };
-
         (
             fn_return,
             profile_data::ProfileData::new(frames, samples, Some(weights)),
@@ -165,7 +161,11 @@ fn unmangle_name(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::unmangle_name;
+    use std::{thread, time::Duration};
+
+    use wasmtime::{Config, Engine, Store};
+
+    use super::{unmangle_name, ProfilerBuilder};
 
     #[test]
     fn unmangles_rust_symbols() {
@@ -191,5 +191,31 @@ mod tests {
     #[test]
     fn preserves_symbols_that_fail_cpp_parsing() {
         assert_eq!(unmangle_name("_Z"), "_Z");
+    }
+
+    #[test]
+    fn rejects_concurrent_profile_calls() {
+        let mut config = Config::new();
+        config.epoch_interruption(true);
+        let engine = Engine::new(&config).unwrap();
+        let mut first_store = Store::new(&engine, ());
+        let mut second_store = Store::new(&engine, ());
+
+        thread::scope(|scope| {
+            let first_profile = scope.spawn(|| {
+                ProfilerBuilder::new(&mut first_store).profile(|_| {
+                    thread::sleep(Duration::from_millis(10));
+                });
+            });
+
+            thread::sleep(Duration::from_millis(1));
+
+            let second_profile = scope.spawn(|| {
+                ProfilerBuilder::new(&mut second_store).profile(|_| {});
+            });
+
+            first_profile.join().unwrap();
+            assert!(second_profile.join().is_err());
+        });
     }
 }
