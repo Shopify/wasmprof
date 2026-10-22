@@ -1,6 +1,6 @@
 [package]
 name = "wasmprof"
-version = "0.12.0"
+version = "0.12.1"
 edition = "2021"
 license = "MIT"
 description = "wasmprof allows to profile code running inside of wasmtime"
@@ -11,8 +11,8 @@ categories = ["wasm", "development-tools::profiling"]
 [dependencies]
 cpp_demangle = "0.5.1"
 libc = "0.2.142"
-nix = { version = "0.31", default-features = false, features = ["signal"] }
 rustc-demangle = "0.1.23"
+signal-hook-registry = "1.4"
 spin_sleep = "1.1.1"
 wasmtime = "36"
 
