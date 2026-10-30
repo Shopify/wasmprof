@@ -1,4 +1,8 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
+    sync::Mutex,
+};
 
 use wasmtime::{Store, UpdateDeadline, WasmBacktrace};
 mod collapsed_stack;
@@ -97,27 +101,48 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         let _active_profile = ACTIVE_PROFILE
             .try_lock()
             .expect("only one profiler can be active at a time");
-        // Elapsed time and fuel consumption restart at zero for each session.
-        *LAST_WEIGHT.lock().unwrap() = 0;
-        let ticker = ticker::Ticker::new(self.frequency, self.store.engine().clone()).unwrap();
-        unsafe {
-            TICKER = Some(ticker);
-        }
+        let mut store_setup_started = false;
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            // Elapsed time and fuel consumption restart at zero for each session.
+            *LAST_WEIGHT.lock().unwrap() = 0;
+            let ticker = ticker::Ticker::new(self.frequency, self.store.engine().clone()).unwrap();
+            unsafe {
+                TICKER = Some(ticker);
+            }
 
-        setup_store(self.store, self.weight_unit);
-
-        let fn_return = f(self.store);
+            store_setup_started = true;
+            setup_store(self.store, self.weight_unit);
+            f(self.store)
+        }));
 
         #[allow(static_mut_refs)]
         let ticker = unsafe { TICKER.take() };
-        if let Some(ticker) = ticker {
-            ticker.end().unwrap();
+        let ticker_result = match ticker {
+            Some(ticker) => ticker.end(),
+            None => Ok(()),
+        };
+        if store_setup_started {
+            self.store.epoch_deadline_trap();
         }
 
-        self.store.epoch_deadline_trap();
-
-        let mut backtraces = BACKTRACES.lock().unwrap();
-        let backtraces = std::mem::take(&mut *backtraces);
+        // A sampling panic may have poisoned the buffer. Drain it on both paths
+        // so an aborted profile cannot contaminate a later session.
+        let backtraces = {
+            let mut backtraces = BACKTRACES.lock().unwrap_or_else(|error| error.into_inner());
+            BACKTRACES.clear_poison();
+            std::mem::take(&mut *backtraces)
+        };
+        if result.is_err() {
+            *LAST_WEIGHT
+                .lock()
+                .unwrap_or_else(|error| error.into_inner()) = 0;
+            LAST_WEIGHT.clear_poison();
+        }
+        // Release normally before resuming a panic (or reporting a stop error),
+        // otherwise the session-exclusion mutex itself would become poisoned.
+        drop(_active_profile);
+        let fn_return = result.unwrap_or_else(|panic| resume_unwind(panic));
+        ticker_result.unwrap();
 
         let mut name_to_i = HashMap::new();
         let mut frames = Vec::new();
@@ -163,11 +188,16 @@ fn unmangle_name(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::Mutex, thread, time::Duration};
+    use std::{
+        panic::{catch_unwind, AssertUnwindSafe},
+        sync::{Arc, Mutex},
+        thread,
+        time::Duration,
+    };
 
     use wasmtime::{Config, Engine, Instance, Module, Store};
 
-    use super::{unmangle_name, ProfilerBuilder, LAST_WEIGHT};
+    use super::{unmangle_name, ProfilerBuilder, WeightUnit, BACKTRACES, LAST_WEIGHT};
 
     // Tests that start profiles must not overlap with each other.
     static PROFILE_TEST_LOCK: Mutex<()> = Mutex::new(());
@@ -233,6 +263,94 @@ mod tests {
         });
 
         assert!(data.into_collapsed_stacks().to_string().contains("work"));
+    }
+
+    #[test]
+    fn cleans_up_after_a_workload_panic() {
+        let _test = PROFILE_TEST_LOCK.lock().unwrap();
+        let engine = Engine::default();
+        let weak_engine = engine.weak();
+        let mut store = Store::new(&engine, ());
+
+        let panic = catch_unwind(AssertUnwindSafe(|| {
+            ProfilerBuilder::new(&mut store).profile(|store| {
+                *LAST_WEIGHT.lock().unwrap() = 100;
+                BACKTRACES
+                    .lock()
+                    .unwrap()
+                    .push((wasmtime::WasmBacktrace::capture(store), 100));
+                panic!("workload failed");
+            });
+        }))
+        .unwrap_err();
+
+        assert_eq!(panic.downcast_ref::<&str>(), Some(&"workload failed"));
+        assert!(BACKTRACES.lock().unwrap().is_empty());
+        assert_eq!(*LAST_WEIGHT.lock().unwrap(), 0);
+        ProfilerBuilder::new(&mut store).profile(|_| ());
+        drop(store);
+        drop(engine);
+        // A leaked ticker thread or signal handler would retain the engine.
+        assert!(weak_engine.upgrade().is_none());
+    }
+
+    #[test]
+    fn cleans_up_after_setup_panics() {
+        let _test = PROFILE_TEST_LOCK.lock().unwrap();
+        for (frequency, unit) in [(0, WeightUnit::Nanoseconds), (1000, WeightUnit::Fuel)] {
+            let engine = Engine::default();
+            let weak_engine = engine.weak();
+            let mut store = Store::new(&engine, ());
+            assert!(catch_unwind(AssertUnwindSafe(|| {
+                ProfilerBuilder::new(&mut store)
+                    .frequency(frequency)
+                    .weight_unit(unit)
+                    .profile(|_| ());
+            }))
+            .is_err());
+            ProfilerBuilder::new(&mut store).profile(|_| ());
+            drop(store);
+            drop(engine);
+            assert!(weak_engine.upgrade().is_none());
+        }
+    }
+
+    #[test]
+    fn preserves_existing_callback_when_ticker_creation_panics() {
+        let _test = PROFILE_TEST_LOCK.lock().unwrap();
+        let engine = Engine::default();
+        let mut store = Store::new(&engine, ());
+        let marker = Arc::new(());
+        let captured = marker.clone();
+        store.epoch_deadline_callback(move |_| {
+            let _keep_alive = &captured;
+            Ok(wasmtime::UpdateDeadline::Continue(1))
+        });
+
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            ProfilerBuilder::new(&mut store)
+                .frequency(0)
+                .profile(|_| ());
+        }))
+        .is_err());
+        // The original callback still owns its marker: cleanup did not drop it.
+        assert_eq!(Arc::strong_count(&marker), 2);
+    }
+
+    #[test]
+    fn recovers_a_buffer_poisoned_during_sampling() {
+        let _test = PROFILE_TEST_LOCK.lock().unwrap();
+        let engine = Engine::default();
+        let mut store = Store::new(&engine, ());
+        assert!(catch_unwind(AssertUnwindSafe(|| {
+            ProfilerBuilder::new(&mut store).profile(|_| {
+                let _backtraces = BACKTRACES.lock().unwrap();
+                panic!("sampling failed");
+            });
+        }))
+        .is_err());
+        assert!(!BACKTRACES.is_poisoned());
+        ProfilerBuilder::new(&mut store).profile(|_| ());
     }
 
     #[test]
