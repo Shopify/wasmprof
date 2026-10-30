@@ -97,6 +97,8 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         let _active_profile = ACTIVE_PROFILE
             .try_lock()
             .expect("only one profiler can be active at a time");
+        // Elapsed time and fuel consumption restart at zero for each session.
+        *LAST_WEIGHT.lock().unwrap() = 0;
         let ticker = ticker::Ticker::new(self.frequency, self.store.engine().clone()).unwrap();
         unsafe {
             TICKER = Some(ticker);
@@ -161,11 +163,14 @@ fn unmangle_name(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::{thread, time::Duration};
+    use std::{sync::Mutex, thread, time::Duration};
 
     use wasmtime::{Config, Engine, Store};
 
-    use super::{unmangle_name, ProfilerBuilder};
+    use super::{unmangle_name, ProfilerBuilder, LAST_WEIGHT};
+
+    // Tests that start profiles must not overlap with each other.
+    static PROFILE_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn unmangles_rust_symbols() {
@@ -194,7 +199,23 @@ mod tests {
     }
 
     #[test]
+    fn resets_weight_baseline_between_profiles() {
+        let _test = PROFILE_TEST_LOCK.lock().unwrap();
+        let engine = Engine::default();
+        let mut store = Store::new(&engine, ());
+
+        ProfilerBuilder::new(&mut store).profile(|_| {
+            *LAST_WEIGHT.lock().unwrap() = 100;
+        });
+        ProfilerBuilder::new(&mut store).profile(|_| {
+            let last_weight = *LAST_WEIGHT.lock().unwrap();
+            assert_eq!(last_weight, 0);
+        });
+    }
+
+    #[test]
     fn rejects_concurrent_profile_calls() {
+        let _test = PROFILE_TEST_LOCK.lock().unwrap();
         let mut config = Config::new();
         config.epoch_interruption(true);
         let engine = Engine::new(&config).unwrap();
