@@ -56,7 +56,7 @@ fn add_weighted_backtrace<T>(context: wasmtime::StoreContextMut<'_, T>, weight: 
 
     let last_weight = *LAST_WEIGHT.lock().unwrap();
     *LAST_WEIGHT.lock().unwrap() = weight;
-    backtraces.push((WasmBacktrace::capture(context), weight - last_weight));
+    backtraces.push((WasmBacktrace::force_capture(context), weight - last_weight));
 }
 
 /// A builder for the profiler. It allows to set the frequency at which the profiler
@@ -165,7 +165,7 @@ fn unmangle_name(name: &str) -> String {
 mod tests {
     use std::{sync::Mutex, thread, time::Duration};
 
-    use wasmtime::{Config, Engine, Store};
+    use wasmtime::{Config, Engine, Instance, Module, Store};
 
     use super::{unmangle_name, ProfilerBuilder, LAST_WEIGHT};
 
@@ -211,6 +211,28 @@ mod tests {
             let last_weight = *LAST_WEIGHT.lock().unwrap();
             assert_eq!(last_weight, 0);
         });
+    }
+
+    #[test]
+    fn profiles_when_error_backtraces_are_disabled() {
+        let _test = PROFILE_TEST_LOCK.lock().unwrap();
+        let mut config = Config::new();
+        config.epoch_interruption(true).wasm_backtrace(false);
+        let engine = Engine::new(&config).unwrap();
+        let module = Module::new(&engine, "(module (func $work (export \"work\")))").unwrap();
+        let mut store = Store::new(&engine, ());
+        let instance = Instance::new(&mut store, &module, &[]).unwrap();
+        let work = instance
+            .get_typed_func::<(), ()>(&mut store, "work")
+            .unwrap();
+
+        let (_, data) = ProfilerBuilder::new(&mut store).profile(|store| {
+            // Trigger a sample at function entry without waiting for a tick.
+            engine.increment_epoch();
+            work.call(store, ()).unwrap();
+        });
+
+        assert!(data.into_collapsed_stacks().to_string().contains("work"));
     }
 
     #[test]
