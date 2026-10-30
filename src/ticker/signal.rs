@@ -18,10 +18,15 @@ impl TickerImpl {
         }
         .map_err(|_| Error::RegisterError)?;
 
-        Ok(Self {
-            timer: timer::Timer::new(frequency),
-            signal_id,
-        })
+        // Timer construction can panic before a Ticker exists for the caller
+        // to clean up (for example, when frequency is zero).
+        let timer =
+            std::panic::catch_unwind(|| timer::Timer::new(frequency)).unwrap_or_else(|panic| {
+                signal_hook_registry::unregister(signal_id);
+                std::panic::resume_unwind(panic)
+            });
+
+        Ok(Self { timer, signal_id })
     }
 
     pub fn duration(&self) -> Duration {
