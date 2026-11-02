@@ -101,7 +101,6 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         let _active_profile = ACTIVE_PROFILE
             .try_lock()
             .expect("only one profiler can be active at a time");
-        let mut store_setup_started = false;
         let result = catch_unwind(AssertUnwindSafe(|| {
             // Elapsed time and fuel consumption restart at zero for each session.
             *LAST_WEIGHT.lock().unwrap() = 0;
@@ -110,7 +109,6 @@ impl<'a, T> ProfilerBuilder<'a, T> {
                 TICKER = Some(ticker);
             }
 
-            store_setup_started = true;
             setup_store(self.store, self.weight_unit);
             f(self.store)
         }));
@@ -118,12 +116,13 @@ impl<'a, T> ProfilerBuilder<'a, T> {
         #[allow(static_mut_refs)]
         let ticker = unsafe { TICKER.take() };
         let ticker_result = match ticker {
-            Some(ticker) => ticker.end(),
+            Some(ticker) => {
+                let result = ticker.end();
+                self.store.epoch_deadline_trap();
+                result
+            }
             None => Ok(()),
         };
-        if store_setup_started {
-            self.store.epoch_deadline_trap();
-        }
 
         // A sampling panic may have poisoned the buffer. Drain it on both paths
         // so an aborted profile cannot contaminate a later session.
