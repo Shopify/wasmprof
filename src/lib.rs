@@ -217,7 +217,9 @@ mod tests {
     fn profiles_when_error_backtraces_are_disabled() {
         let _test = PROFILE_TEST_LOCK.lock().unwrap();
         let mut config = Config::new();
-        config.epoch_interruption(true).wasm_backtrace(false);
+        config
+            .epoch_interruption(true)
+            .wasm_backtrace_max_frames(None);
         let engine = Engine::new(&config).unwrap();
         let module = Module::new(&engine, "(module (func $work (export \"work\")))").unwrap();
         let mut store = Store::new(&engine, ());

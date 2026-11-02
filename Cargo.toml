@@ -14,7 +14,7 @@ libc = "0.2.142"
 rustc-demangle = "0.1.23"
 signal-hook-registry = "1.4"
 spin_sleep = "1.1.1"
-wasmtime = "36"
+wasmtime = "48"
 
 [features]
 perf-event = []
